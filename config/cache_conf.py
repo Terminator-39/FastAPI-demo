@@ -41,8 +41,8 @@ async def redis_getJsonCache(key: str):
 async def redis_setCache(key: str, value: Any, expire_time: int = 3600):
     '''设置缓存'''
     try:
-        if isinstance(value,(dict,list)):
-            value = json.dumps(value, ensure_ascii=False) # json格式化 保留中文
+        if isinstance(value, (dict, list)):
+            value = json.dumps(value, ensure_ascii=False)  # json格式化 保留中文
         await redis_client.setex(key, expire_time, value)
         return True
     except Exception as e:

@@ -67,7 +67,7 @@ async def get_user_by_token(db: AsyncSession, token: str):
     '''根据token获取用户'''
     result = await db.execute(select(UserToken).where(UserToken.token.like(str(token))))
     res = result.scalar_one_or_none()
-    if res is None or res.expire_time <= datetime.now():
+    if res is None or res.expire_time <= datetime.utcnow():
         return None
     res_info = await db.get(User, res.user_id)
     return res_info

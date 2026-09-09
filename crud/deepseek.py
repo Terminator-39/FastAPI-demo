@@ -21,10 +21,23 @@ SESSION_HISTORY_EXPIRE = 3600
 
 
 async def check_rate_limit(session_id: str):
+    """
+    检查请求频率是否超过限制
+    Args:
+        session_id (str): 用户会话ID，用于标识不同的请求来源
+    Returns:
+        None: 如果请求频率在限制范围内，正常返回
+    Raises:
+        HTTPException: 当请求频率超过限制时，抛出429状态码的异常
+    """
+    # 构建Redis键，使用session_id作为标识
     key = f"deepseek:rate_limit:{session_id}"
+    # 使用Redis的incr命令增加计数器，如果键不存在则创建并设置为1
     count = await redis_client.incr(key)
+    # 如果计数器为1，说明是第一次请求，设置过期时间
     if count == 1:
         await redis_client.expire(key, RATE_LIMIT_WINDOW)
+    # 如果计数器超过预设的限制值，抛出异常
     if count > RATE_LIMIT:
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
 
