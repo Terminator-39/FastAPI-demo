@@ -1,0 +1,28 @@
+# python 虚拟环境，千万不要上传
+venv/
+env/
+.venv/
+
+# python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 环境变量、密钥！！防止泄露数据库密码、token
+.env
+.env.*
+
+# 数据库文件
+*.db
+*.sqlite
+
+# 日志
+*.log
+
+# IDE配置
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
