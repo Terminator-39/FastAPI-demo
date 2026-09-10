@@ -17,6 +17,10 @@ httpx_stub = types.ModuleType("httpx")
 httpx_stub.Response = object
 sys.modules.setdefault("httpx", httpx_stub)
 
+dotenv_stub = types.ModuleType("dotenv")
+dotenv_stub.load_dotenv = lambda: None
+sys.modules.setdefault("dotenv", dotenv_stub)
+
 pydantic_stub = types.ModuleType("pydantic")
 pydantic_stub.BaseModel = object
 pydantic_stub.Field = lambda default=None, **_kwargs: default
@@ -26,7 +30,7 @@ sys.modules.setdefault("pydantic", pydantic_stub)
 sys.modules.setdefault("pydantic.v1", pydantic_v1_stub)
 
 from cache import deepseek_stream
-from crud.deepseek_stream import _iter_sse_data
+from crud.deepseek_stream import _iter_sse_data, _trim_history
 
 
 class FakeRedis:
@@ -34,6 +38,7 @@ class FakeRedis:
         self.values = {}
         self.lists = {}
         self.counters = {}
+        self.sorted_sets = {}
 
     async def set(self, key, value, **kwargs):
         if kwargs.get("nx") and key in self.values:
@@ -57,6 +62,17 @@ class FakeRedis:
     async def lrange(self, key, start, end):
         return self.lists.get(key, [])[start:]
 
+    async def zadd(self, key, values):
+        self.sorted_sets.setdefault(key, {}).update(values)
+
+    async def zrevrange(self, key, start, end):
+        items = sorted(
+            self.sorted_sets.get(key, {}).items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        return [item[0] for item in items[start:]]
+
 
 class FakeResponse:
     def __init__(self, lines):
@@ -68,6 +84,18 @@ class FakeResponse:
 
 
 class DeepSeekResumeTests(unittest.TestCase):
+    def test_session_owner_is_claimed_once_and_rejects_other_users(self):
+        async def run():
+            redis = FakeRedis()
+            with patch.object(deepseek_stream, "redis_client", redis):
+                self.assertTrue(await deepseek_stream.ensure_session_owner("s1", 7))
+                self.assertTrue(await deepseek_stream.ensure_session_owner("s1", 7))
+                self.assertFalse(await deepseek_stream.ensure_session_owner("s1", 8))
+                sessions = await deepseek_stream.list_sessions(7)
+                self.assertEqual(sessions[0]["id"], "s1")
+
+        asyncio.run(run())
+
     def test_events_are_sequenced_and_replayed_after_last_id(self):
         async def run():
             redis = FakeRedis()
@@ -93,6 +121,15 @@ class DeepSeekResumeTests(unittest.TestCase):
             self.assertEqual(events[1], "[DONE]")
 
         asyncio.run(run())
+
+    def test_history_context_is_bounded_and_keeps_message_pairs_aligned(self):
+        history = [
+            {"role": "user" if index % 2 == 0 else "assistant", "content": str(index)}
+            for index in range(24)
+        ]
+        trimmed = _trim_history(history)
+        self.assertLessEqual(len(trimmed), 20)
+        self.assertEqual(trimmed[0]["role"], "user")
 
 
 if __name__ == "__main__":

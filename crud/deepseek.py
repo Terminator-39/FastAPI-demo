@@ -22,9 +22,9 @@ SESSION_HISTORY_EXPIRE = 3600
 
 async def check_rate_limit(session_id: str):
     """
-    检查请求频率是否超过限制
+    检查指定会话的请求频率是否超过限制。
     Args:
-        session_id (str): 用户会话ID，用于标识不同的请求来源
+        session_id (str): 当前聊天会话 ID，用于隔离限流计数
     Returns:
         None: 如果请求频率在限制范围内，正常返回
     Raises:
@@ -43,6 +43,7 @@ async def check_rate_limit(session_id: str):
 
 
 async def get_ai_response(prompt, session_id):
+    """调用非流式模型接口并返回完整 assistant 文本。"""
     await check_rate_limit(session_id)
     if not api_key:
         raise HTTPException(status_code=500, detail="未配置 DEEPSEEK_API_KEY")
@@ -70,7 +71,11 @@ async def get_ai_response(prompt, session_id):
 
 # 异步流式请求 DeepSeek API
 async def get_ai_response_stream(messages: list[AIChatStreamRequest], session_id: str):
-    '''异步流式请求ds'''
+    """调用旧版非持久化流式接口并逐块转发上游响应。
+
+    当前主聊天链路使用 crud.deepseek_stream.run_ai_response_stream；
+    该函数保留给旧接口，历史上下文仍按 session_id 存取。
+    """
     # 检查 API Key 是否已配置
     if not api_key:
         raise HTTPException(status_code=500, detail="未配置 DEEPSEEK_API_KEY")
