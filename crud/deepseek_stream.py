@@ -5,9 +5,15 @@ import httpx
 from cache.deepseek_stream import append_event, set_request_status
 from config.cache_conf import redis_client, redis_getJsonCache, redis_setCache
 from schemas.deepseek import AIChatStreamRequest
+import os
+from dotenv import load_dotenv
 
-BASE_URL = "https://api.deepseek.com/v1/chat/completions"
-api_key = 'sk-7d7a697d53ff487db84128d2c429af37'
+# 加在环境变量
+load_dotenv()
+
+# BASE_URL = "https://api.deepseek.com/v1/chat/completions"
+# api_key = 'sk-7d7a697d53ff487db84128d2c429af37'
+api_key = os.getenv('API_KEY')
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json"
@@ -51,7 +57,7 @@ async def run_ai_response_stream(
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
                     "POST",
-                    BASE_URL,
+                    os.getenv('BASE_URL'),
                     json=payload,
                     headers=headers,
             ) as resp:
